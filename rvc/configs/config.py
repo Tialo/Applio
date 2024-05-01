@@ -1,6 +1,9 @@
 import torch
 import json
 import os
+from pathlib import Path
+
+current_file_path = Path(__file__).resolve()
 
 version_config_list = [
     "v1/32000.json",
@@ -29,6 +32,7 @@ class Config:
         self.use_jit = False
         self.n_cpu = 0
         self.gpu_name = None
+        self.fp32_set = False
         self.json_config = self.load_config_json()
         self.gpu_mem = None
         self.instead = ""
@@ -38,7 +42,8 @@ class Config:
     def load_config_json() -> dict:
         d = {}
         for config_file in version_config_list:
-            with open(f"rvc/configs/{config_file}", "r") as f:
+            #                      .../rvc/configs
+            with open(os.path.join(current_file_path.parent, config_file), "r") as f:
                 d[config_file] = json.load(f)
         return d
 
@@ -60,19 +65,23 @@ class Config:
             return False
 
     def use_fp32_config(self):
+        if self.fp32_set:
+            return
         print(
             f"Using FP32 config instead of FP16 due to GPU compatibility ({self.gpu_name})"
         )
         for config_file in version_config_list:
             self.json_config[config_file]["train"]["fp16_run"] = False
-            with open(f"rvc/configs/{config_file}", "r") as f:
+            with open(os.path.join(current_file_path.parent, config_file), "r") as f:
                 strr = f.read().replace("true", "false")
-            with open(f"rvc/configs/{config_file}", "w") as f:
+            with open(os.path.join(current_file_path.parent, config_file), "w") as f:
                 f.write(strr)
-        with open("rvc/train/preprocess/preprocess.py", "r") as f:
+        preprocess_path = os.path.join(current_file_path.parent.parent, "train", "preprocess", "preprocess.py")
+        with open(preprocess_path, "r") as f:
             strr = f.read().replace("3.7", "3.0")
-        with open("rvc/train/preprocess/preprocess.py", "w") as f:
+        with open(preprocess_path, "w") as f:
             f.write(strr)
+        self.fp32_set = True
 
     def device_config(self) -> tuple:
         if torch.cuda.is_available():
@@ -99,9 +108,12 @@ class Config:
                 + 0.4
             )
             if self.gpu_mem <= 4:
-                with open("rvc/train/preprocess/preprocess.py", "r") as f:
+                preprocess_path = os.path.join(
+                    current_file_path.parent.parent, "train", "preprocess", "preprocess.py"
+                )
+                with open(preprocess_path, "r") as f:
                     strr = f.read().replace("3.7", "3.0")
-                with open("rvc/train/preprocess/preprocess.py", "w") as f:
+                with open(preprocess_path, "w") as f:
                     f.write(strr)
         elif self.has_mps():
             print("No supported Nvidia GPU found")

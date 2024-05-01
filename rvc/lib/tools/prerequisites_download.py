@@ -1,5 +1,8 @@
 import os
 import wget
+from pathlib import Path
+
+project_dir = os.path.dirname(Path(__file__).parent.parent.parent)
 
 url_base = "https://huggingface.co/IAHispano/Applio/resolve/main/Resources"
 pretraineds_v1_list = [
@@ -59,7 +62,7 @@ folder_mapping_list = {
 def prequisites_download_pipeline(pretraineds_v1, pretraineds_v2, models, exe):
     def download_files(file_list):
         for file_name in file_list:
-            destination_path = os.path.join(file_name)
+            destination_path = os.path.join(project_dir, file_name)
             url = f"{url_base}/{file_name}"
             if not os.path.exists(destination_path):
                 os.makedirs(os.path.dirname(destination_path) or ".", exist_ok=True)

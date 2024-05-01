@@ -1,19 +1,22 @@
 from multiprocessing import cpu_count
 import os
 import sys
+from pathlib import Path
 
 from scipy import signal
 from scipy.io import wavfile
 import librosa
 import numpy as np
 
-now_directory = os.getcwd()
+now_directory = os.path.dirname(Path(__file__).parent.parent.parent)
 sys.path.append(now_directory)
 
 from rvc.lib.utils import load_audio
 from rvc.train.slicer import Slicer
 
 experiment_directory = sys.argv[1]
+
+# assets/datasets/model_name
 input_root = sys.argv[2]
 sampling_rate = int(sys.argv[3])
 percentage = float(sys.argv[4])
@@ -70,7 +73,7 @@ class PreProcess:
 
     def process_audio(self, path, idx0):
         try:
-            audio = load_audio(path, self.sr)
+            audio = load_audio(os.path.join(now_directory, path), self.sr)
             audio = signal.lfilter(self.b_high, self.a_high, audio)
 
             idx1 = 0
@@ -101,7 +104,7 @@ class PreProcess:
         try:
             infos = [
                 (f"{input_root}/{name}", idx)
-                for idx, name in enumerate(sorted(list(os.listdir(input_root))))
+                for idx, name in enumerate(sorted(list(os.listdir(os.path.join(now_directory, input_root)))))
             ]
             processes = []
             for i in range(num_processes):

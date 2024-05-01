@@ -1,7 +1,7 @@
 import os
-import subprocess
 import sys
 import shutil
+from pathlib import Path
 import gradio as gr
 from assets.i18n.i18n import I18nAuto
 from core import (
@@ -16,7 +16,7 @@ from rvc.lib.utils import format_title
 from tabs.settings.restart import restart_applio
 
 i18n = I18nAuto()
-now_dir = os.getcwd()
+now_dir = os.path.dirname(Path(__file__).parent.parent)
 sys.path.append(now_dir)
 
 pretraineds_v1 = [
@@ -64,16 +64,14 @@ pretraineds_custom_path = os.path.join(
     now_dir, "rvc", "pretraineds", "pretraineds_custom"
 )
 
-pretraineds_custom_path_relative = os.path.relpath(pretraineds_custom_path, now_dir)
-
-if not os.path.exists(pretraineds_custom_path_relative):
-    os.makedirs(pretraineds_custom_path_relative)
+if not os.path.exists(pretraineds_custom_path):
+    os.makedirs(pretraineds_custom_path)
 
 
 def get_pretrained_list(suffix):
     return [
         os.path.join(dirpath, filename)
-        for dirpath, _, filenames in os.walk(pretraineds_custom_path_relative)
+        for dirpath, _, filenames in os.walk(pretraineds_custom_path)
         for filename in filenames
         if filename.endswith(".pth") and suffix in filename
     ]
@@ -146,7 +144,7 @@ def save_drop_model(dropbox):
         )
     else:
         file_name = os.path.basename(dropbox)
-        pretrained_path = os.path.join(pretraineds_custom_path_relative, file_name)
+        pretrained_path = os.path.join(pretraineds_custom_path, file_name)
         if os.path.exists(pretrained_path):
             os.remove(pretrained_path)
         os.rename(dropbox, pretrained_path)

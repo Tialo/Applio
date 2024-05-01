@@ -4,7 +4,7 @@ import json
 import argparse
 import subprocess
 
-now_dir = os.getcwd()
+now_dir = os.path.dirname(__file__)
 sys.path.append(now_dir)
 
 from rvc.configs.config import Config
@@ -30,7 +30,7 @@ current_script_directory = os.path.dirname(os.path.realpath(__file__))
 logs_path = os.path.join(current_script_directory, "logs")
 
 # Get TTS Voices
-with open(os.path.join("rvc", "lib", "tools", "tts_voices.json"), "r") as f:
+with open(os.path.join(now_dir, "rvc", "lib", "tools", "tts_voices.json"), "r") as f:
     voices_data = json.load(f)
 
 locales = list({voice["Locale"] for voice in voices_data})
@@ -136,69 +136,10 @@ def run_batch_infer_script(
     return f"Files from {input_folder} inferred successfully."
 
 
-# TTS
-def run_tts_script(
-    tts_text,
-    tts_voice,
-    f0up_key,
-    filter_radius,
-    index_rate,
-    rms_mix_rate,
-    protect,
-    hop_length,
-    f0method,
-    output_tts_path,
-    output_rvc_path,
-    pth_path,
-    index_path,
-    split_audio,
-    f0autotune,
-    clean_audio,
-    clean_strength,
-    export_format,
-):
-    tts_script_path = os.path.join("rvc", "lib", "tools", "tts.py")
-
-    if os.path.exists(output_tts_path):
-        os.remove(output_tts_path)
-
-    command_tts = [
-        "python",
-        tts_script_path,
-        tts_text,
-        tts_voice,
-        output_tts_path,
-    ]
-    subprocess.run(command_tts)
-
-    infer_pipeline(
-        f0up_key,
-        filter_radius,
-        index_rate,
-        rms_mix_rate,
-        protect,
-        hop_length,
-        f0method,
-        output_tts_path,
-        output_rvc_path,
-        pth_path,
-        index_path,
-        split_audio,
-        f0autotune,
-        clean_audio,
-        clean_strength,
-        export_format,
-    )
-
-    return f"Text {tts_text} synthesized successfully.", output_rvc_path.replace(
-        ".wav", f".{export_format.lower()}"
-    )
-
-
 # Preprocess
 def run_preprocess_script(model_name, dataset_path, sampling_rate):
     per = 3.0 if config.is_half else 3.7
-    preprocess_script_path = os.path.join("rvc", "train", "preprocess", "preprocess.py")
+    preprocess_script_path = os.path.join(now_dir, "rvc", "train", "preprocess", "preprocess.py")
     command = [
         "python",
         preprocess_script_path,
@@ -222,10 +163,10 @@ def run_preprocess_script(model_name, dataset_path, sampling_rate):
 def run_extract_script(model_name, rvc_version, f0method, hop_length, sampling_rate):
     model_path = os.path.join(logs_path, model_name)
     extract_f0_script_path = os.path.join(
-        "rvc", "train", "extract", "extract_f0_print.py"
+        now_dir, "rvc", "train", "extract", "extract_f0_print.py"
     )
     extract_feature_script_path = os.path.join(
-        "rvc", "train", "extract", "extract_feature_print.py"
+        now_dir, "rvc", "train", "extract", "extract_feature_print.py"
     )
 
     command_1 = [
@@ -1137,27 +1078,6 @@ def main():
                 str(args.clean_strength),
                 str(args.export_format),
             )
-        elif args.mode == "tts":
-            run_tts_script(
-                str(args.tts_text),
-                str(args.tts_voice),
-                str(args.f0up_key),
-                str(args.filter_radius),
-                str(args.index_rate),
-                str(args.rms_mix_rate),
-                str(args.protect),
-                str(args.hop_length),
-                str(args.f0method),
-                str(args.output_tts_path),
-                str(args.output_rvc_path),
-                str(args.pth_path),
-                str(args.index_path),
-                str(args.split_audio),
-                str(args.f0autotune),
-                str(args.clean_audio),
-                str(args.clean_strength),
-                str(args.export_format),
-            )
         elif args.mode == "preprocess":
             run_preprocess_script(
                 str(args.model_name),
@@ -1243,5 +1163,6 @@ def main():
         print(f"Error: {error}")
 
 
+run_prerequisites_script("False", "True", "True", "True")
 if __name__ == "__main__":
     main()

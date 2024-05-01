@@ -6,7 +6,7 @@ from random import shuffle
 from rvc.configs.config import Config
 
 config = Config()
-current_directory = os.getcwd()
+current_directory = os.path.dirname(pathlib.Path(__file__).parent.parent.parent)
 
 
 def generate_config(rvc_version, sampling_rate, model_path):

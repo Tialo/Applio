@@ -3,7 +3,7 @@ import json
 from pathlib import Path
 from locale import getdefaultlocale
 
-now_dir = os.getcwd()
+now_dir = os.path.dirname(Path(__file__).parent.parent)
 sys.path.append(now_dir)
 
 

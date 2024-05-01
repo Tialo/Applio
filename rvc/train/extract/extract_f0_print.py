@@ -4,11 +4,12 @@ import numpy as np
 import pyworld
 import torchcrepe
 import torch
+from pathlib import Path
 import parselmouth
 import tqdm
 from multiprocessing import Process, cpu_count
 
-current_directory = os.getcwd()
+current_directory = os.path.dirname(Path(__file__).parent.parent.parent)
 sys.path.append(current_directory)
 
 
@@ -133,7 +134,7 @@ class FeatureInput:
         if not hasattr(self, "model_rmvpe"):
             from rvc.lib.rmvpe import RMVPE
 
-            self.model_rmvpe = RMVPE("rmvpe.pt", is_half=False, device="cpu")
+            self.model_rmvpe = RMVPE(os.path.join(current_directory, "rmvpe.pt"), is_half=False, device="cpu")
         return self.model_rmvpe.infer_from_audio(x, thred=0.03)
 
     def get_f0_method_dict(self):
