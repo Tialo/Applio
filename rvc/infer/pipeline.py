@@ -8,10 +8,11 @@ import pyworld, os, faiss, librosa, torchcrepe
 from scipy import signal
 from functools import lru_cache
 import random
+from pathlib import Path
 import gc
 import re
 
-now_dir = os.getcwd()
+now_dir = os.path.dirname(Path(__file__).parent.parent)
 sys.path.append(now_dir)
 
 from rvc.lib.FCPEF0Predictor import FCPEF0Predictor
@@ -215,7 +216,7 @@ class VC(object):
                     from rvc.lib.rmvpe import RMVPE
 
                     self.model_rmvpe = RMVPE(
-                        "rmvpe.pt", is_half=self.is_half, device=self.device
+                        os.path.join(now_dir, "rmvpe.pt"), is_half=self.is_half, device=self.device
                     )
                 f0 = self.model_rmvpe.infer_from_audio(x, thred=0.03)
                 f0 = f0[1:]
@@ -305,7 +306,7 @@ class VC(object):
                 from rvc.lib.rmvpe import RMVPE
 
                 self.model_rmvpe = RMVPE(
-                    "rmvpe.pt", is_half=self.is_half, device=self.device
+                    os.path.join(now_dir, "rmvpe.pt"), is_half=self.is_half, device=self.device
                 )
             f0 = self.model_rmvpe.infer_from_audio(x, thred=0.03)
         elif f0_method == "fcpe":

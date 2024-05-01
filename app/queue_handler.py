@@ -1,6 +1,7 @@
 import time
 
 import train
+import infer
 from utils import db
 
 
@@ -13,10 +14,10 @@ def main_loop():
                 time.sleep(10)
                 continue
             curs.execute(
-                "select id, task_type, user_id, model_name from queue "
+                "select id, task_type, user_id, model_name, infer_path from queue "
                 "where status = 'queue' order by add_time asc limit 1"
             )
-            [task_id, task_type, user_id, model_name] = curs.fetchone()
+            [task_id, task_type, user_id, model_name, infer_path] = curs.fetchone()
             curs.execute("update queue set status = ? where id = ?", ("running", task_id))
             con.commit()
         if task_type == "train":
@@ -32,15 +33,34 @@ def main_loop():
                     con.commit()
                     curs.execute("update queue set status = ? where id = ?", ("error", task_id))
                     con.commit()
-                raise e
+                raise e  # TODO: Заменить на логи
                 continue
-            with db.connect() as con:
-                curs = con.cursor()
-                curs.execute("update queue set status = ? where id = ?", ("done", task_id))
-                con.commit()
+        elif task_type == "infer":
+            print(f"infer {user_id=} {model_name=} {infer_path=}")
+            try:
+                infer.infer(user_id, model_name, infer_path)
+            except Exception as e:
+                print(e)
+                print(str(e))
+                with db.connect() as con:
+                    curs = con.cursor()
+                    curs.execute(
+                        "delete from infers where user_id = ? and model_name = ? and infer_path = ?",
+                        (user_id, model_name, infer_path)
+                    )
+                    con.commit()
+                    curs.execute("update queue set status = ? where id = ?", ("error", task_id))
+                    con.commit()
+                raise e  # TODO: Заменить на логи
+                continue
         else:
             raise NotImplementedError
 
+        with db.connect() as con:
+            curs = con.cursor()
+            curs.execute("update queue set status = ? where id = ?", ("done", task_id))
+            con.commit()
+
 
 if __name__ == '__main__':
-    main_loop()
+    main_loop()()

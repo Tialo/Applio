@@ -301,14 +301,17 @@ async def cancel(update: Update, context: ContextTypes.DEFAULT_TYPE) -> int:
 async def dashboard(update: Update, context: ContextTypes.DEFAULT_TYPE) -> None:
     with db.connect() as con:
         curs = con.cursor()
-        curs.execute("select model_name, status, add_time from queue where user_id = ?", (update.message.from_user.id, ))
+        curs.execute(
+            "select model_name, status, add_time, task_type from queue where user_id = ?",
+            (update.message.from_user.id, )
+        )
         res = curs.fetchall()
     if not res:
         await update.message.reply_text("У вас нет задач")
         return
     mes = "\n".join(
-        f"[{i + 1}] <{model_name}> {{{status}}} {datetime.datetime.fromtimestamp(add_time)}"
-        for i, (model_name, status, add_time) in enumerate(res)
+        f"[{i + 1}] <{model_name}> {{{status}}} ({task_type}) {datetime.datetime.fromtimestamp(add_time)}"
+        for i, (model_name, status, add_time, task_type) in enumerate(res)
     )
     await update.message.reply_text(mes)
 
@@ -323,7 +326,7 @@ async def infer_start(update: Update, context: ContextTypes.DEFAULT_TYPE) -> int
             return ConversationHandler.END
 
         curs.execute(
-            "select count(*) from queue where user_id = ? and task_type = ?",
+            "select count(*) from queue where user_id = ? and task_type = ? and status not in ('error', 'done')",
             (update.message.from_user.id, "infer")
         )
         if curs.fetchone()[0] >= 3:
@@ -332,14 +335,14 @@ async def infer_start(update: Update, context: ContextTypes.DEFAULT_TYPE) -> int
 
     attachment = update.message.effective_attachment
     file = await attachment.get_file()
-    filename = uuid.uuid4().hex + ".wav"
+    filename = uuid.uuid4().hex + ".ogg"
     os.makedirs(os.path.join(DATA_DIR, "infer", str(update.message.from_user.id)), exist_ok=True)
     await file.download_to_drive(os.path.join(DATA_DIR, "infer", str(update.message.from_user.id), filename))
     with db.connect() as con:
         curs = con.cursor()
         curs.execute("delete from infers where user_id = ?", (update.message.from_user.id,))
         con.commit()
-        curs.execute("insert into infers (user_id, file_path) values (?, ?)", (update.message.from_user.id, filename))
+        curs.execute("insert into infers (user_id, infer_path) values (?, ?)", (update.message.from_user.id, filename))
         con.commit()
     markup = []
     for i in range(0, len(res), 2):
@@ -351,7 +354,7 @@ async def infer_start(update: Update, context: ContextTypes.DEFAULT_TYPE) -> int
     return INFER_MODEL
 
 
-def infer_model(update: Update, context: ContextTypes.DEFAULT_TYPE) -> int:
+async def infer_model(update: Update, context: ContextTypes.DEFAULT_TYPE) -> int:
     model_name = update.message.text
     with db.connect() as con:
         curs = con.cursor()
@@ -370,6 +373,8 @@ def infer_model(update: Update, context: ContextTypes.DEFAULT_TYPE) -> int:
             "(?, ?, ?, ?, ?, ?)", (update.message.from_user.id, model_name, "queue", now, "infer", infer_path)
         )
         con.commit()
+    await update.message.reply_text("Задача добавлена в очередь", reply_markup=ReplyKeyboardRemove())
+    return ConversationHandler.END
 
 
 def main() -> None:
@@ -388,14 +393,15 @@ def main() -> None:
         fallbacks=[CommandHandler("cancel", cancel)],
     )
     infer_handler = ConversationHandler(
-        entry_points=[MessageHandler(filters.AUDIO, infer_start)],
+        entry_points=[MessageHandler(filters.VOICE, infer_start)],
         states={
-            INFER_MODEL: [MessageHandler(filters.TEXT, lambda x: x)]
+            INFER_MODEL: [MessageHandler(filters.TEXT, infer_model)]
         },
         fallbacks=[CommandHandler("cancel", cancel)]
     )
 
     application.add_handler(train_handler)
+    application.add_handler(infer_handler)
     application.add_handler(CommandHandler("dashboard", dashboard))
 
     # Run the bot until the user presses Ctrl-C

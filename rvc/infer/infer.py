@@ -3,12 +3,13 @@ import sys
 import time
 import torch
 import logging
+from pathlib import Path
 
 import numpy as np
 import soundfile as sf
 import librosa
 
-now_dir = os.getcwd()
+now_dir = os.path.dirname(Path(__file__).parent.parent)
 sys.path.append(now_dir)
 
 from rvc.infer.pipeline import VC
@@ -42,7 +43,7 @@ n_spk = None
 def load_hubert():
     global hubert_model
     models, _, _ = checkpoint_utils.load_model_ensemble_and_task(
-        ["hubert_base.pt"],
+        [os.path.join(now_dir, "hubert_base.pt")],
         suffix="",
     )
     hubert_model = models[0]
