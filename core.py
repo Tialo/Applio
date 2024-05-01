@@ -237,7 +237,7 @@ def run_train_script(
     else:
         pg, pd = "", ""
 
-    train_script_path = os.path.join("rvc", "train", "train.py")
+    train_script_path = os.path.join(now_dir, "rvc", "train", "train.py")
     command = [
         "python",
         train_script_path,
@@ -285,7 +285,7 @@ def run_train_script(
 
 # Index
 def run_index_script(model_name, rvc_version):
-    index_script_path = os.path.join("rvc", "train", "process", "extract_index.py")
+    index_script_path = os.path.join(now_dir, "rvc", "train", "process", "extract_index.py")
     command = [
         "python",
         index_script_path,

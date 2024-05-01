@@ -1,8 +1,12 @@
 import os
+import shutil
+from string import ascii_letters
 import sqlite3
 from pathlib import Path
 
-DATA_DIR = Path(__file__).parent.parent / "data"
+ROOT_DIR = Path(__file__).parent.parent
+DATA_DIR = ROOT_DIR / "data"
+MODELS_DIR = ROOT_DIR / "models"
 os.makedirs(DATA_DIR, exist_ok=True)
 
 
@@ -34,7 +38,9 @@ class DataBase:
                 create table if not exists pretrains (
                     id integer primary key,
                     pretrain_name text not null,
-                    sample rate integer not null
+                    sr integer not null,
+                    d_path text not null,
+                    g_path text not null
                 )
             """)
             con.commit()
@@ -43,7 +49,10 @@ class DataBase:
                     id integer primary key,
                     model_name text not null,
                     user_id integer not null,
-                    public integer not null
+                    public integer not null,
+                    pretrain_name text not null,
+                    epochs integer not null,
+                    batch_size integer not null
                 )
             """)
             con.commit()
@@ -70,3 +79,43 @@ class DataBase:
 
 
 db = DataBase()
+
+
+def upload_pretrain(pretrain_name, sr, g_path, d_path):
+    with db.connect() as con:
+        curs = con.cursor()
+        curs.execute("select pretrain_name from pretrains")
+        pretrains = set(curs.fetchall())
+
+    pretraineds_custom_dir = Path(__file__).parent.parent / "rvc" / "pretraineds" / "pretraineds_custom"
+    if pretrain_name in pretrains:
+        raise ValueError("Модель с таким названием уже есть")
+
+    if sr not in [32000, 40000, 48000]:
+        raise ValueError("Допустимые значения sample rate: [32000, 40000, 48000]")
+
+    if not os.path.isfile(g_path):
+        raise ValueError("Такого файла нет. Введите правильный путь до генератора")
+
+    if not os.path.isfile(d_path):
+        raise ValueError("Такого файла нет. Введите правильный путь до дискриминатора")
+
+    new_g_path = os.path.join(pretraineds_custom_dir, os.path.basename(g_path))
+    new_d_path = os.path.join(pretraineds_custom_dir, os.path.basename(d_path))
+    shutil.copy(g_path, new_g_path)
+    shutil.copy(d_path, new_d_path)
+
+    with db.connect() as con:
+        curs = con.cursor()
+        curs.execute(
+            "insert into pretrains (pretrain_name, sr, g_path, d_path) values (?, ?, ?, ?)",
+            (pretrain_name, sr, new_g_path, new_d_path)
+        )
+        con.commit()
+
+
+def valid_model_name(name):
+    for c in name:
+        if c not in ascii_letters and c not in "0123456789":
+            return False
+    return True

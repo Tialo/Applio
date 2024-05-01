@@ -1,6 +1,7 @@
 import torch
 import sys
 import os
+from pathlib import Path
 import datetime
 
 from utils import (
@@ -24,7 +25,7 @@ from torch.utils.tensorboard import SummaryWriter
 import torch.distributed as dist
 import torch.multiprocessing as mp
 
-now_dir = os.getcwd()
+now_dir = os.path.dirname(Path(__file__).parent.parent)
 sys.path.append(os.path.join(now_dir))
 
 

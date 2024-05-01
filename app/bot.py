@@ -3,6 +3,7 @@ import time
 import wave
 import shutil
 import logging
+import datetime
 
 from telegram import ReplyKeyboardRemove, Update, ReplyKeyboardMarkup
 from telegram.ext import (
@@ -14,7 +15,7 @@ from telegram.ext import (
     filters,
 )
 
-from utils import db, DATA_DIR
+from utils import db, DATA_DIR, valid_model_name
 
 
 logging.basicConfig(
@@ -24,14 +25,30 @@ logging.getLogger("httpx").setLevel(logging.WARNING)
 logger = logging.getLogger(__name__)
 
 
-TRAIN_LANGUAGE, TRAIN_EPOCHS, TRAIN_BATCH_SIZE, TRAIN_MODEL_NAME, TRAIN_DATASET = range(5)
+TRAIN_PRETRAIN, TRAIN_EPOCHS, TRAIN_BATCH_SIZE, TRAIN_MODEL_NAME, TRAIN_DATASET = range(5)
 
 
 async def train_model(update: Update, context: ContextTypes.DEFAULT_TYPE) -> int:
     os.makedirs(os.path.join(DATA_DIR, str(update.message.from_user.id)), exist_ok=True)
+    with db.connect() as con:
+        curs = con.cursor()
+        curs.execute("select pretrain_name, sr from pretrains")
+        res = curs.fetchall()
+    if not res:
+        await update.message.reply_text(
+            "В сервисе нет pretrain моделей. Зайдите позже!"
+        )
+        return ConversationHandler.END
+
+    markup = []
+    for i in range(0, len(res), 2):
+        m = [f"{res[i][0]}; SR={res[i][1]}HZ"]
+        if i + 1 < len(res):
+            m.append(f"{res[i+1][0]}; SR={res[i][1]}HZ")
+        markup.append(m)
     await update.message.reply_text(
-        "Выберите язык модели",
-        reply_markup=ReplyKeyboardMarkup([["Русский", "Английский"]], one_time_keyboard=True)
+        "Выберите pretrain модель",
+        reply_markup=ReplyKeyboardMarkup(markup, one_time_keyboard=True)
     )
     with db.connect() as con:
         cursor = con.cursor()
@@ -39,21 +56,22 @@ async def train_model(update: Update, context: ContextTypes.DEFAULT_TYPE) -> int
         con.commit()
         cursor.execute("insert into train_params (user_id) values (?)", (update.message.from_user.id, ))
         con.commit()
-    return TRAIN_LANGUAGE
+    return TRAIN_PRETRAIN
 
 
-async def train_language(update: Update, context: ContextTypes.DEFAULT_TYPE) -> int:
-    language = update.message.text
-    if language == "Русский":
-        pretrain_name = "SnowieV3"
-    elif language == "Английский":
-        pretrain_name = "Titan"
-    else:
-        await update.message.reply_text("Выбран неверный язык. Повторите попытку")
-        return TRAIN_LANGUAGE
+async def train_pretrain(update: Update, context: ContextTypes.DEFAULT_TYPE) -> int:
+    pretrain = update.message.text
+    if "; SR=" not in pretrain or not pretrain.endswith("HZ"):
+        await update.message.reply_text("Выберите pretrain модель из вариантов на клавиатуре")
+        return TRAIN_PRETRAIN
+    pretrain_name, _ = pretrain.split(";")
 
     with db.connect() as con:
         curs = con.cursor()
+        curs.execute("select count(*) from pretrains where pretrain_name = ?", (pretrain_name, ))
+        if not curs.fetchone()[0]:
+            await update.message.reply_text("Выберите pretrain модель из вариантов на клавиатуре")
+            return TRAIN_PRETRAIN
         curs.execute(
             "update train_params set pretrain_name = ? where user_id = ?",
             (pretrain_name, update.message.from_user.id)
@@ -129,8 +147,8 @@ async def train_batch_size(update: Update, context: ContextTypes.DEFAULT_TYPE) -
 
 async def train_model_name(update: Update, context: ContextTypes.DEFAULT_TYPE) -> int:
     model_name = update.message.text
-    if not model_name.isalnum():
-        await update.message.reply_text("Название модели может содержать только цифры и буквы. Повторите попытку")
+    if not valid_model_name(model_name):
+        await update.message.reply_text("Название модели может содержать только цифры и латинские буквы. Повторите попытку")
         return TRAIN_MODEL_NAME
 
     if len(model_name) > 32:
@@ -174,8 +192,11 @@ async def train_dataset(update: Update, context: ContextTypes.DEFAULT_TYPE) -> i
     markup = ReplyKeyboardMarkup(reply_keyboard, one_time_keyboard=True)
     with db.connect() as con:
         curs = con.cursor()
-        curs.execute("select model_name from train_params where user_id = ?", (update.message.from_user.id, ))
-        [model_name] = curs.fetchone()
+        curs.execute(
+            "select model_name, epochs, pretrain_name, batch_size from train_params where user_id = ?",
+            (update.message.from_user.id, )
+        )
+        [model_name, epochs, pretrain_name, batch_size] = curs.fetchone()
     if attachment is None:
         if update.message.text != "Начать обучение":
             return TRAIN_DATASET
@@ -194,6 +215,13 @@ async def train_dataset(update: Update, context: ContextTypes.DEFAULT_TYPE) -> i
             curs.execute(
                 "insert into queue (user_id, model_name, status, add_time, task_type) values (?, ?, ?, ?, ?)",
                 (update.message.from_user.id, model_name, "queue", now, "train")
+            )
+            con.commit()
+
+            curs.execute(
+                "insert into models (user_id, model_name, public, pretrain_name, epochs, batch_size) values"
+                "(?, ?, ?, ?, ?, ?)",
+                (update.message.from_user.id, model_name, False, pretrain_name, epochs, batch_size)
             )
             con.commit()
         await update.message.reply_text("Задача обучения добавлена в очередь", reply_markup=ReplyKeyboardRemove())
@@ -268,6 +296,21 @@ async def cancel(update: Update, context: ContextTypes.DEFAULT_TYPE) -> int:
     return ConversationHandler.END
 
 
+async def dashboard(update: Update, context: ContextTypes.DEFAULT_TYPE) -> None:
+    with db.connect() as con:
+        curs = con.cursor()
+        curs.execute("select model_name, status, add_time from queue where user_id = ?", (update.message.from_user.id, ))
+        res = curs.fetchall()
+    if not res:
+        await update.message.reply_text("У вас нет задач")
+        return
+    mes = "\n".join(
+        f"[{i + 1}] <{model_name}> {{{status}}} {datetime.datetime.fromtimestamp(add_time)}"
+        for i, (model_name, status, add_time) in enumerate(res)
+    )
+    await update.message.reply_text(mes)
+
+
 def main() -> None:
     """Run the bot."""
     # Create the Application and pass it your bot's token.
@@ -275,7 +318,7 @@ def main() -> None:
     train_handler = ConversationHandler(
         entry_points=[CommandHandler("train_model", train_model)],
         states={
-            TRAIN_LANGUAGE: [MessageHandler(filters.TEXT, train_language)],
+            TRAIN_PRETRAIN: [MessageHandler(filters.TEXT, train_pretrain)],
             TRAIN_EPOCHS: [MessageHandler(filters.TEXT, train_epochs)],
             TRAIN_BATCH_SIZE: [MessageHandler(filters.TEXT, train_batch_size)],
             TRAIN_MODEL_NAME: [MessageHandler(filters.TEXT, train_model_name)],
@@ -285,6 +328,7 @@ def main() -> None:
     )
 
     application.add_handler(train_handler)
+    application.add_handler(CommandHandler("dashboard", dashboard))
 
     # Run the bot until the user presses Ctrl-C
     application.run_polling(allowed_updates=Update.ALL_TYPES)
