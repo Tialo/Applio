@@ -115,7 +115,7 @@ class Config:
                     strr = f.read().replace("3.7", "3.0")
                 with open(preprocess_path, "w") as f:
                     f.write(strr)
-        elif self.has_mps():
+        elif self.has_mps() or True:
             print("No supported Nvidia GPU found")
             self.device = self.instead = "mps"
             self.is_half = False
