@@ -29,6 +29,6 @@ def infer(user_id, model_name, infer_path):
         clean_strength=0.5,
         export_format="WAV"
     )
-    asyncio.run(send_infer_file(user_id, os.path.join(input_dir, infer_path.replace(".ogg", ".wav"))))
+    asyncio.run(send_infer_file(user_id, os.path.join(input_dir, infer_path.replace(".ogg", "out.wav"))))
     os.remove(os.path.join(input_dir, infer_path))
     os.remove(os.path.join(input_dir, infer_path.replace(".ogg", ".wav")))

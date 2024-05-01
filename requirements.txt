@@ -6,7 +6,7 @@ tqdm
 wget
 
 # Audio processing
-faiss-cpu==1.7.3
+faiss-cpu==1.7.0
 librosa==0.9.1
 pyworld==0.3.4
 scipy==1.11.1

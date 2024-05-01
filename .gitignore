@@ -14,3 +14,5 @@ env
 venv
 .venv
 data
+venv39
+models
