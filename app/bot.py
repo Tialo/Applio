@@ -1,5 +1,6 @@
 import os
 import time
+import uuid
 import wave
 import shutil
 import logging
@@ -26,6 +27,7 @@ logger = logging.getLogger(__name__)
 
 
 TRAIN_PRETRAIN, TRAIN_EPOCHS, TRAIN_BATCH_SIZE, TRAIN_MODEL_NAME, TRAIN_DATASET = range(5)
+INFER_MODEL = 0
 
 
 async def train_model(update: Update, context: ContextTypes.DEFAULT_TYPE) -> int:
@@ -311,6 +313,65 @@ async def dashboard(update: Update, context: ContextTypes.DEFAULT_TYPE) -> None:
     await update.message.reply_text(mes)
 
 
+async def infer_start(update: Update, context: ContextTypes.DEFAULT_TYPE) -> int:
+    with db.connect() as con:
+        curs = con.cursor()
+        curs.execute("select model_name from models where user_id = ?", (update.message.from_user.id, ))
+        res = curs.fetchall()
+        if not res:
+            await update.message.reply_text("У вас нет моделей для преобразования голоса")
+            return ConversationHandler.END
+
+        curs.execute(
+            "select count(*) from queue where user_id = ? and task_type = ?",
+            (update.message.from_user.id, "infer")
+        )
+        if curs.fetchone()[0] >= 3:
+            await update.message.reply_text("У вас уже запущено три задачи преобразования голоса. Подождите")
+            return ConversationHandler.END
+
+    attachment = update.message.effective_attachment
+    file = await attachment.get_file()
+    filename = uuid.uuid4().hex + ".wav"
+    os.makedirs(os.path.join(DATA_DIR, "infer", str(update.message.from_user.id)), exist_ok=True)
+    await file.download_to_drive(os.path.join(DATA_DIR, "infer", str(update.message.from_user.id), filename))
+    with db.connect() as con:
+        curs = con.cursor()
+        curs.execute("delete from infers where user_id = ?", (update.message.from_user.id,))
+        con.commit()
+        curs.execute("insert into infers (user_id, file_path) values (?, ?)", (update.message.from_user.id, filename))
+        con.commit()
+    markup = []
+    for i in range(0, len(res), 2):
+        m = [res[i][0]]
+        if i + 1 < len(res):
+            m.append(res[i + 1][0])
+        markup.append(m)
+    await update.message.reply_text("Выберите модель", reply_markup=ReplyKeyboardMarkup(markup))
+    return INFER_MODEL
+
+
+def infer_model(update: Update, context: ContextTypes.DEFAULT_TYPE) -> int:
+    model_name = update.message.text
+    with db.connect() as con:
+        curs = con.cursor()
+        curs.execute(
+            "select count(*) from models where user_id = ? and model_name = ?",
+            (update.message.from_user.id, model_name)
+        )
+        if not curs.fetchone()[0]:
+            await update.message.reply_text("Выбрана неверная модель")
+            return INFER_MODEL
+        curs.execute("select infer_path from infers where user_id = ?", (update.message.from_user.id, ))
+        [infer_path] = curs.fetchone()
+        now = int(time.time())
+        curs.execute(
+            "insert into queue (user_id, model_name, status, add_time, task_type, infer_path) values "
+            "(?, ?, ?, ?, ?, ?)", (update.message.from_user.id, model_name, "queue", now, "infer", infer_path)
+        )
+        con.commit()
+
+
 def main() -> None:
     """Run the bot."""
     # Create the Application and pass it your bot's token.
@@ -325,6 +386,13 @@ def main() -> None:
             TRAIN_DATASET: [MessageHandler(filters.AUDIO | filters.TEXT, train_dataset)],
         },
         fallbacks=[CommandHandler("cancel", cancel)],
+    )
+    infer_handler = ConversationHandler(
+        entry_points=[MessageHandler(filters.AUDIO, infer_start)],
+        states={
+            INFER_MODEL: [MessageHandler(filters.TEXT, lambda x: x)]
+        },
+        fallbacks=[CommandHandler("cancel", cancel)]
     )
 
     application.add_handler(train_handler)

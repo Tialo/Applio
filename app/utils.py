@@ -72,10 +72,18 @@ class DataBase:
                     model_name integer not null,
                     status text not null,
                     add_time integer timestamp not null,
-                    task_type text not null
+                    task_type text not null,
+                    infer_path text
                 )
             """)
             con.commit()
+            cursor.execute("""
+                create table if not exists infers (
+                    user_id integer not null,
+                    model_name integer,
+                    file_path text not null
+                )
+            """)
 
 
 db = DataBase()
