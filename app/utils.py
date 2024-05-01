@@ -165,6 +165,8 @@ def valid_model_name(name):
 async def send_infer_file(user_id, file_path):
     async with Bot("6863679219:AAFXkmmvYQ988Cy2MogkDgVygUUAV4V1kAM") as bot:
         with BytesIO() as bio:
-            AudioSegment.from_wav(file_path).export(bio)
+            audio = AudioSegment.from_ogg(file_path)
+            duration = audio.duration_seconds
+            audio.export(bio)
             bio.seek(0)
-            await bot.send_voice(chat_id=user_id, voice=bio, caption="Преобразованное сообщение")
+            await bot.send_voice(chat_id=user_id, voice=bio, caption="Преобразованное сообщение", duration=duration)
