@@ -31,6 +31,7 @@ def main_loop():
                 print(f"train {user_id=} {model_name=}")
                 train.train(user_id, model_name)
                 curs.execute("update queue set status = ? where id = ?", ("done", task_id))
+                con.commit()
             else:
                 raise NotImplementedError
 

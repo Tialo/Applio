@@ -188,12 +188,8 @@ def run_extract_script(model_name, rvc_version, f0method, hop_length, sampling_r
             str,
             [
                 config.device,
-                "1",
-                "0",
-                "0",
                 model_path,
                 rvc_version,
-                "True",
             ],
         ),
     ]

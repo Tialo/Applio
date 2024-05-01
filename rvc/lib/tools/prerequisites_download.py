@@ -90,7 +90,7 @@ def prequisites_download_pipeline(pretraineds_v1, pretraineds_v2, models, exe):
         for remote_folder, file_list in pretraineds_v2_list:
             local_folder = folder_mapping_list.get(remote_folder, "")
             for file in file_list:
-                destination_path = os.path.join(local_folder, file)
+                destination_path = os.path.join(project_dir, local_folder, file)
                 url = f"{url_base}/{remote_folder}{file}"
                 if not os.path.exists(destination_path):
                     os.makedirs(os.path.dirname(destination_path) or ".", exist_ok=True)

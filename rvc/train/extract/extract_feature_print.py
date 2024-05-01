@@ -1,6 +1,8 @@
 import os
+os.environ["PYTORCH_ENABLE_MPS_FALLBACK"] = '1'
 import sys
 import tqdm
+from pathlib import Path
 import torch
 import torch.nn.functional as F
 import fairseq
@@ -12,15 +14,15 @@ import logging
 logging.getLogger("fairseq").setLevel(logging.WARNING)
 
 device = sys.argv[1]
-n_parts = int(sys.argv[2])
-i_part = int(sys.argv[3])
 
-if len(sys.argv) == 7:
-    exp_dir, version, is_half = sys.argv[4], sys.argv[5], bool(sys.argv[6])
-else:
-    i_gpu, exp_dir = sys.argv[4], sys.argv[5]
-    os.environ["CUDA_VISIBLE_DEVICES"] = str(i_gpu)
-    version, is_half = sys.argv[6], bool(sys.argv[7])
+if device == "mps":
+    device = "cpu"
+
+project_dir = os.path.dirname(Path(__file__).parent.parent.parent)
+
+exp_dir = sys.argv[2]
+os.environ["CUDA_VISIBLE_DEVICES"] = '0'
+version, is_half = sys.argv[3], True
 
 
 def forward_dml(ctx, x, scale):
@@ -31,7 +33,7 @@ def forward_dml(ctx, x, scale):
 
 fairseq.modules.grad_multiply.GradMultiply.forward = forward_dml
 
-model_path = "hubert_base.pt"
+model_path = os.path.join(project_dir, "hubert_base.pt")
 
 wav_path = f"{exp_dir}/1_16k_wavs"
 out_path = f"{exp_dir}/3_feature256" if version == "v1" else f"{exp_dir}/3_feature768"
@@ -59,11 +61,14 @@ models, saved_cfg, task = fairseq.checkpoint_utils.load_model_ensemble_and_task(
 model = models[0]
 model = model.to(device)
 if device not in ["mps", "cpu"]:
+    is_half = True
     model = model.half()
+else:
+    is_half = False
+
 model.eval()
 
-todo = sorted(os.listdir(wav_path))[i_part::n_parts]
-n = max(1, len(todo) // 10)
+todo = sorted(os.listdir(wav_path))
 
 if len(todo) == 0:
     print(

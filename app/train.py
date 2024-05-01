@@ -28,12 +28,12 @@ def create_dataset(user_id, model_name):
 
 def preprocess_dataset(user_id, model_name):
     # TODO: заменить 40000 на select
-    run_preprocess_script(f"{user_id}_{model_name}", f"assets/datasets/{user_id}_{model_name}", 40000)
+    run_preprocess_script(f"{user_id}_{model_name}", f"assets/datasets/{user_id}_{model_name}", "40000")
 
 
 def extract_features(user_id, model_name):
     # TODO: заменить 40000 на select
-    run_extract_script(f"{user_id}_{model_name}", "v2", "rmvpe", 128, 40000)
+    run_extract_script(f"{user_id}_{model_name}", "v2", "rmvpe", 128, "40000")
 
 
 def train(user_id, model_name):

@@ -18,7 +18,7 @@ from rvc.lib.utils import load_audio
 
 exp_dir = sys.argv[1]
 f0_method = sys.argv[2]
-num_processes = cpu_count()
+num_processes = 2
 
 try:
     hop_length = int(sys.argv[3])
