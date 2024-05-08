@@ -16,6 +16,7 @@ from telegram.ext import (
     filters,
 )
 
+from config import token
 from utils import db, DATA_DIR, valid_model_name
 
 
@@ -380,7 +381,7 @@ async def infer_model(update: Update, context: ContextTypes.DEFAULT_TYPE) -> int
 def main() -> None:
     """Run the bot."""
     # Create the Application and pass it your bot's token.
-    application = Application.builder().token("6863679219:AAFXkmmvYQ988Cy2MogkDgVygUUAV4V1kAM").build()
+    application = Application.builder().token(token).build()
     train_handler = ConversationHandler(
         entry_points=[CommandHandler("train_model", train_model)],
         states={

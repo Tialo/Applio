@@ -8,6 +8,8 @@ from pathlib import Path
 from telegram import Bot
 from pydub import AudioSegment
 
+from config import token
+
 ROOT_DIR = Path(__file__).parent.parent
 DATA_DIR = ROOT_DIR / "data"
 MODELS_DIR = ROOT_DIR / "models"
@@ -163,7 +165,7 @@ def valid_model_name(name):
 
 
 async def send_infer_file(user_id, file_path):
-    async with Bot("6863679219:AAFXkmmvYQ988Cy2MogkDgVygUUAV4V1kAM") as bot:
+    async with Bot(token) as bot:
         with BytesIO() as bio:
             audio = AudioSegment.from_ogg(file_path)
             duration = audio.duration_seconds

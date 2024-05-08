@@ -54,9 +54,7 @@ class PreProcess:
         if tmp_max > 2.5:
             print(f"{idx0}-{idx1}-{tmp_max}-filtered")
             return
-        tmp_audio = (tmp_audio / tmp_max * (self.max_amplitude * self.alpha)) + (
-            1 - self.alpha
-        ) * tmp_audio
+        tmp_audio = (self.max_amplitude * self.alpha) * (tmp_audio / tmp_max) + (1 - self.alpha) * tmp_audio
         wavfile.write(
             f"{self.gt_wavs_dir}/{idx0}_{idx1}.wav",
             self.sr,
