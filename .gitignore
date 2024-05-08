@@ -19,3 +19,4 @@ models
 app/config.py
 app/upload_model.py
 app/enc.py
+app/upload_pretrain.py
