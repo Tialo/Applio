@@ -8,7 +8,7 @@ from pathlib import Path
 from telegram import Bot
 from pydub import AudioSegment
 
-from config import token
+token = os.environ["TOKEN"]
 
 ROOT_DIR = Path(__file__).parent.parent
 DATA_DIR = ROOT_DIR / "data"

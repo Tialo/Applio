@@ -16,8 +16,7 @@ from telegram.ext import (
     filters,
 )
 
-from config import token
-from utils import db, DATA_DIR, valid_model_name
+from utils import db, DATA_DIR, valid_model_name, token
 
 
 logging.basicConfig(
