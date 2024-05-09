@@ -5,10 +5,10 @@ from core import run_infer_script
 from utils import DATA_DIR, MODELS_DIR, send_infer_file
 
 
-def infer(user_id, model_name, infer_path):
+def infer(user_id, model_name, infer_path, f0up):
     input_dir = os.path.join(DATA_DIR, "infer", str(user_id))
     run_infer_script(
-        f0up_key=0,
+        f0up_key=f0up,
         filter_radius=3,
         index_rate=0.75,
         rms_mix_rate=1,

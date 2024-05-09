@@ -27,7 +27,7 @@ logger = logging.getLogger(__name__)
 
 
 TRAIN_PRETRAIN, TRAIN_EPOCHS, TRAIN_BATCH_SIZE, TRAIN_MODEL_NAME, TRAIN_DATASET = range(5)
-INFER_MODEL = 0
+INFER_MODEL, INFER_PITCH = range(2)
 
 
 async def train_model(update: Update, context: ContextTypes.DEFAULT_TYPE) -> int:
@@ -288,13 +288,9 @@ async def train_dataset(update: Update, context: ContextTypes.DEFAULT_TYPE) -> i
 
 
 async def cancel(update: Update, context: ContextTypes.DEFAULT_TYPE) -> int:
-    """Cancels and ends the conversation."""
-    user = update.message.from_user
-    logger.info("User %s canceled the conversation.", user.first_name)
     await update.message.reply_text(
-        "Bye! I hope we can talk again some day.", reply_markup=ReplyKeyboardRemove()
+        "Задача отменена", reply_markup=ReplyKeyboardRemove()
     )
-
     return ConversationHandler.END
 
 
@@ -365,21 +361,47 @@ async def infer_model(update: Update, context: ContextTypes.DEFAULT_TYPE) -> int
         if not curs.fetchone()[0]:
             await update.message.reply_text("Выбрана неверная модель")
             return INFER_MODEL
-        curs.execute("select infer_path from infers where user_id = ?", (update.message.from_user.id, ))
-        [infer_path] = curs.fetchone()
+
+        curs.execute("update infers set model_name = ? where user_id = ?", (model_name, update.message.from_user.id))
+        con.commit()
+    await update.message.reply_text(
+        "Выберите изменение тона. Если у вас высокий голос, а хотите сделать низкий, "
+        "то выбирайте отрицательное значение. Если хотите сделать наоборот, выбирайте положительное. "
+        "Чем больше значение, тем сильнее изменение. Допустимые значения от -24 до 24. "
+        "Если не хотите менять тон выберите 0",
+        reply_markup=ReplyKeyboardMarkup(["0"])
+    )
+    return INFER_PITCH
+
+
+async def infer_pitch(update: Update, context: ContextTypes.DEFAULT_TYPE) -> int:
+    pitch = update.message.text
+    try:
+        pitch = int(pitch)
+    except:
+        await update.message.reply_text("Значение изменения тона должно быть целом числом от -24 до 24")
+        return INFER_PITCH
+
+    if not -24 <= pitch <= 24:
+        await update.message.reply_text("Значение изменения тона должно быть целом числом от -24 до 24")
+        return INFER_PITCH
+
+    with db.connect() as con:
+        curs = con.cursor()
+        curs.execute("select infer_path, model_name from infers where user_id = ?", (update.message.from_user.id,))
+        [infer_path, model_name] = curs.fetchone()
         now = int(time.time())
         curs.execute(
-            "insert into queue (user_id, model_name, status, add_time, task_type, infer_path) values "
-            "(?, ?, ?, ?, ?, ?)", (update.message.from_user.id, model_name, "queue", now, "infer", infer_path)
+            "insert into queue (user_id, model_name, status, add_time, task_type, infer_path, f0up) values "
+            "(?, ?, ?, ?, ?, ?)", (update.message.from_user.id, model_name, "queue", now, "infer", infer_path, pitch)
         )
         con.commit()
+
     await update.message.reply_text("Задача добавлена в очередь", reply_markup=ReplyKeyboardRemove())
     return ConversationHandler.END
 
 
 def main() -> None:
-    """Run the bot."""
-    # Create the Application and pass it your bot's token.
     application = Application.builder().token(token).build()
     train_handler = ConversationHandler(
         entry_points=[CommandHandler("train_model", train_model)],
@@ -395,7 +417,8 @@ def main() -> None:
     infer_handler = ConversationHandler(
         entry_points=[MessageHandler(filters.VOICE, infer_start)],
         states={
-            INFER_MODEL: [MessageHandler(filters.TEXT, infer_model)]
+            INFER_MODEL: [MessageHandler(filters.TEXT, infer_model)],
+            INFER_PITCH: [MessageHandler(filters.TEXT, infer_pitch)]
         },
         fallbacks=[CommandHandler("cancel", cancel)]
     )
@@ -404,7 +427,6 @@ def main() -> None:
     application.add_handler(infer_handler)
     application.add_handler(CommandHandler("dashboard", dashboard))
 
-    # Run the bot until the user presses Ctrl-C
     application.run_polling(allowed_updates=Update.ALL_TYPES)
 
 

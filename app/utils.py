@@ -80,13 +80,14 @@ class DataBase:
                     add_time integer timestamp not null,
                     task_type text not null,
                     infer_path text
+                    f0up integer
                 )
             """)
             con.commit()
             cursor.execute("""
                 create table if not exists infers (
                     user_id integer not null,
-                    model_name integer,
+                    model_name text,
                     infer_path text not null
                 )
             """)

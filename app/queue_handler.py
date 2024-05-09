@@ -11,13 +11,13 @@ def main_loop():
             curs = con.cursor()
             curs.execute("select count(*) from queue where status = 'queue'")
             if not curs.fetchone()[0]:
-                time.sleep(10)
+                time.sleep(5)
                 continue
             curs.execute(
-                "select id, task_type, user_id, model_name, infer_path from queue "
+                "select id, task_type, user_id, model_name, infer_path, f0up from queue "
                 "where status = 'queue' order by add_time asc limit 1"
             )
-            [task_id, task_type, user_id, model_name, infer_path] = curs.fetchone()
+            [task_id, task_type, user_id, model_name, infer_path, f0up] = curs.fetchone()
             curs.execute("update queue set status = ? where id = ?", ("running", task_id))
             con.commit()
         if task_type == "train":
@@ -29,8 +29,8 @@ def main_loop():
                 print(str(e))
                 with db.connect() as con:
                     curs = con.cursor()
-                    curs.execute("delete from models where user_id = ? and model_name = ?", (user_id, model_name))
-                    con.commit()
+                    # curs.execute("delete from models where user_id = ? and model_name = ?", (user_id, model_name))
+                    # con.commit()
                     curs.execute("update queue set status = ? where id = ?", ("error", task_id))
                     con.commit()
                 raise e  # TODO: Заменить на логи
@@ -38,17 +38,17 @@ def main_loop():
         elif task_type == "infer":
             print(f"infer {user_id=} {model_name=} {infer_path=}")
             try:
-                infer.infer(user_id, model_name, infer_path)
+                infer.infer(user_id, model_name, infer_path, f0up)
             except Exception as e:
                 print(e)
                 print(str(e))
                 with db.connect() as con:
                     curs = con.cursor()
-                    curs.execute(
-                        "delete from infers where user_id = ? and model_name = ? and infer_path = ?",
-                        (user_id, model_name, infer_path)
-                    )
-                    con.commit()
+                    # curs.execute(
+                    #     "delete from infers where user_id = ? and model_name = ? and infer_path = ?",
+                    #     (user_id, model_name, infer_path)
+                    # )
+                    # con.commit()
                     curs.execute("update queue set status = ? where id = ?", ("error", task_id))
                     con.commit()
                 raise e  # TODO: Заменить на логи

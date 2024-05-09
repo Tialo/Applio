@@ -19,3 +19,9 @@ models
 app/upload_model.py
 app/enc.py
 app/upload_pretrain.py
+img
+*.db
+*.bat
+.DS_Store
+*.ipynb
+app/data.py
