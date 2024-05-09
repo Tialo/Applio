@@ -173,3 +173,9 @@ async def send_infer_file(user_id, file_path):
             audio.export(bio)
             bio.seek(0)
             await bot.send_voice(chat_id=user_id, voice=bio, caption="Преобразованное сообщение", duration=duration)
+
+
+def update_status(task_id, status):
+    with db.connect() as con:
+        con.execute("update queue set status = ? where id = ?", (status, task_id))
+        con.commit()

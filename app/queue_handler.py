@@ -9,7 +9,7 @@ def main_loop():
     while True:
         with db.connect() as con:
             curs = con.cursor()
-            curs.execute("select count(*) from queue where status = 'queue'")
+            curs.execute("select count(*) from queue where status = 'В очереди'")
             if not curs.fetchone()[0]:
                 time.sleep(5)
                 continue
@@ -18,12 +18,12 @@ def main_loop():
                 "where status = 'queue' order by add_time asc limit 1"
             )
             [task_id, task_type, user_id, model_name, infer_path, f0up] = curs.fetchone()
-            curs.execute("update queue set status = ? where id = ?", ("running", task_id))
+            curs.execute("update queue set status = ? where id = ?", ("Задача выполняется", task_id))
             con.commit()
         if task_type == "train":
             print(f"train {user_id=} {model_name=}")
             try:
-                train.train(user_id, model_name)
+                train.train(task_id, user_id, model_name)
             except Exception as e:
                 print(e)
                 print(str(e))

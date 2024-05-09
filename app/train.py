@@ -8,7 +8,7 @@ from pydub import AudioSegment
 from tabs.train.train import save_drop_dataset_audio
 from core import run_preprocess_script, run_extract_script, run_train_script
 
-from utils import db, DATA_DIR, MODELS_DIR, ROOT_DIR
+from utils import db, DATA_DIR, MODELS_DIR, ROOT_DIR, update_status
 
 
 def merge_wav(user_id, model_name):
@@ -79,7 +79,7 @@ def save_model(user_id, model_name):
     shutil.rmtree(ROOT_DIR / "assets" / "datasets" / f"{user_id}_{model_name}")
 
 
-def train(user_id, model_name):
+def train(task_id, user_id, model_name):
     with db.connect() as con:
         curs = con.cursor()
         curs.execute(
@@ -89,8 +89,13 @@ def train(user_id, model_name):
         [epochs, batch_size, pretrain_name] = curs.fetchone()
         curs.execute("select sr, g_path, d_path from pretrains where pretrain_name = ?", (pretrain_name, ))
         [sr, g_path, d_path] = curs.fetchone()
+    update_status(task_id, "Создание датасета")
     create_dataset(user_id, model_name)
+    update_status(task_id, "Предобработка датасета")
     preprocess_dataset(user_id, model_name, sr)
+    update_status(task_id, "Вычисление признаков")
     extract_features(user_id, model_name, sr)
+    update_status(task_id, "Обучение модели")
     train_model(user_id, model_name, epochs, batch_size, sr, g_path, d_path)
+    update_status(task_id, "Сохранение модели")
     save_model(user_id, model_name)

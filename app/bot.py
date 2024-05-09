@@ -235,7 +235,7 @@ async def train_dataset(update: Update, context: ContextTypes.DEFAULT_TYPE) -> i
             now = int(time.time())
             curs.execute(
                 "insert into queue (user_id, model_name, status, add_time, task_type) values (?, ?, ?, ?, ?)",
-                (update.message.from_user.id, model_name, "queue", now, "train")
+                (update.message.from_user.id, model_name, "В очереди", now, "train")
             )
             con.commit()
 
@@ -415,7 +415,7 @@ async def infer_pitch(update: Update, context: ContextTypes.DEFAULT_TYPE) -> int
         now = int(time.time())
         curs.execute(
             "insert into queue (user_id, model_name, status, add_time, task_type, infer_path, f0up) values "
-            "(?, ?, ?, ?, ?, ?, ?)", (update.message.from_user.id, model_name, "queue", now, "infer", infer_path, pitch)
+            "(?, ?, ?, ?, ?, ?, ?)", (update.message.from_user.id, model_name, "В очереди", now, "infer", infer_path, pitch)
         )
         con.commit()
 
