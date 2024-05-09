@@ -2,14 +2,14 @@ import os
 import time
 import uuid
 import wave
+import json
 import shutil
 import logging
 import datetime
 from functools import wraps
 
 
-import matplotlib.pyplot as plt
-from telegram import ReplyKeyboardRemove, Update, ReplyKeyboardMarkup
+from telegram import ReplyKeyboardRemove, Update, ReplyKeyboardMarkup, InlineKeyboardButton, InlineKeyboardMarkup
 from telegram.ext import (
     Application,
     CommandHandler,
@@ -17,9 +17,10 @@ from telegram.ext import (
     ConversationHandler,
     MessageHandler,
     filters,
+    CallbackQueryHandler,
 )
 
-from utils import db, DATA_DIR, valid_model_name, token
+from utils import db, DATA_DIR, valid_model_name, token, MODELS_DIR
 
 
 logging.basicConfig(
@@ -322,7 +323,7 @@ async def dashboard(update: Update, context: ContextTypes.DEFAULT_TYPE) -> None:
         )
         res = curs.fetchall()
     if not res:
-        await update.message.reply_text("У вас нет задач")
+        await update.message.reply_text("У вас нет активных задач")
         return
     mes = "\n".join(
         f"[{i + 1}] <{model_name}> {{{status}}} ({task_type}) {datetime.datetime.fromtimestamp(add_time)}"
@@ -331,11 +332,87 @@ async def dashboard(update: Update, context: ContextTypes.DEFAULT_TYPE) -> None:
     await update.message.reply_text(mes)
 
 
+def get_models_keyboard(user_id):
+    with db.connect() as con:
+        curs = con.cursor()
+        curs.execute("select model_name, public from models where user_id = ?", (user_id, ))
+        model_names = curs.fetchall()
+    return InlineKeyboardMarkup([
+        [
+            InlineKeyboardButton(
+                model_name,
+                callback_data="my_model" + json.dumps([model_name, public])
+            )
+        ]
+        for model_name, public in model_names
+    ])
+
+
+def get_my_model_keyboard(model_name, is_public):
+    public = "Сделать приватной" if is_public else "Сделать публичной"
+    return InlineKeyboardMarkup([
+        [
+            InlineKeyboardButton("Удалить", callback_data="delete_my_model" + model_name),
+            InlineKeyboardButton(public, callback_data="change_public" + f"{model_name},{is_public}")
+        ],
+        [InlineKeyboardButton("Назад", callback_data="back_to_model")],
+    ])
+
+
+async def models(update: Update, context: ContextTypes.DEFAULT_TYPE) -> None:
+    markup = get_models_keyboard(update.message.from_user.id)
+    if not markup:
+        msg = "У вас нет моделей"
+    else:
+        msg = "Ваши модели:"
+    await update.message.reply_text(msg, reply_markup=markup)
+
+
+async def my_model(update: Update, context: ContextTypes.DEFAULT_TYPE) -> None:
+    query = update.callback_query
+    data = json.loads(query.data.replace("my_model", ""))
+    markup = get_my_model_keyboard(data[0], data[1])
+    await query.answer()
+    await query.edit_message_text(text=f"Модель {data[0]}", reply_markup=markup)
+
+
+async def change_public(update: Update, context: ContextTypes.DEFAULT_TYPE) -> None:
+    query = update.callback_query
+    await query.answer()
+    model_name, is_public = query.data.replace("change_public", "").split(",")
+    with db.connect() as con:
+        curs = con.cursor()
+        curs.execute("update models set public = ? where model_name = ?", (1 - int(is_public), model_name))
+        con.commit()
+    await query.edit_message_text(
+        text=f"Модель {model_name}",
+        reply_markup=get_my_model_keyboard(model_name, 1 - int(is_public))
+    )
+
+
+async def delete_my_model(update: Update, context: ContextTypes.DEFAULT_TYPE) -> None:
+    query = update.callback_query
+    await query.answer()
+    model_name = query.data.replace("delete_my_model", "")
+    with db.connect() as con:
+        curs = con.cursor()
+        curs.execute("delete from models where model_name = ?", (model_name, ))
+        con.commit()
+    shutil.rmtree(MODELS_DIR / f"{query.from_user.id}_{model_name}")
+    await query.edit_message_text(text="Ваши модели:", reply_markup=get_models_keyboard(query.from_user.id))
+
+
+async def back_to_model(update: Update, context: ContextTypes.DEFAULT_TYPE) -> None:
+    query = update.callback_query
+    await query.answer()
+    await query.edit_message_text(text="Ваши модели:", reply_markup=get_models_keyboard(query.from_user.id))
+
+
 @cancel_handler
 async def infer_start(update: Update, context: ContextTypes.DEFAULT_TYPE) -> int:
     with db.connect() as con:
         curs = con.cursor()
-        curs.execute("select model_name from models where user_id = ?", (update.message.from_user.id, ))
+        curs.execute("select model_name from models where user_id = ? or public = 1", (update.message.from_user.id, ))
         res = curs.fetchall()
         if not res:
             await update.message.reply_text("У вас нет моделей для преобразования голоса")
@@ -376,7 +453,7 @@ async def infer_model(update: Update, context: ContextTypes.DEFAULT_TYPE) -> int
     with db.connect() as con:
         curs = con.cursor()
         curs.execute(
-            "select count(*) from models where user_id = ? and model_name = ?",
+            "select count(*) from models where (user_id = ? or public = 1) and model_name = ?",
             (update.message.from_user.id, model_name)
         )
         if not curs.fetchone()[0]:
@@ -447,7 +524,12 @@ def main() -> None:
 
     application.add_handler(train_handler)
     application.add_handler(infer_handler)
+    application.add_handler(CommandHandler("models", models))
     application.add_handler(CommandHandler("dashboard", dashboard))
+    application.add_handler(CallbackQueryHandler(my_model, "^my_model.*"))
+    application.add_handler(CallbackQueryHandler(change_public, "^change_public.*"))
+    application.add_handler(CallbackQueryHandler(delete_my_model, "^delete_my_model.*"))
+    application.add_handler(CallbackQueryHandler(back_to_model, "^back_to_model$"))
 
     application.run_polling(allowed_updates=Update.ALL_TYPES)
 

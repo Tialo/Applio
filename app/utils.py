@@ -137,7 +137,7 @@ def upload_model(model_path, index_path, model_name, user_id, pretrain_name, epo
 
     with db.connect() as con:
         curs = con.cursor()
-        curs.execute("select count(*) from models where user_id = ? and model_name = ?", (user_id, model_name))
+        curs.execute("select count(*) from models where model_name = ?", (model_name, ))
         if curs.fetchone()[0]:
             raise ValueError("Модель с таким названием уже есть у пользователя")
         curs.execute("select count(*) from pretrains where pretrain_name = ?", (pretrain_name, ))
@@ -153,9 +153,9 @@ def upload_model(model_path, index_path, model_name, user_id, pretrain_name, epo
             "(?, ?, ?, ?, ?, ?)", (user_id, model_name, pretrain_name, public, epochs, batch_size)
         )
 
-    os.makedirs(os.path.join(MODELS_DIR, f"{user_id}_{model_name}"), exist_ok=True)
-    shutil.copy(model_path, os.path.join(MODELS_DIR, f"{user_id}_{model_name}", "model.pth"))
-    shutil.copy(index_path, os.path.join(MODELS_DIR, f"{user_id}_{model_name}", "index.index"))
+    os.makedirs(os.path.join(MODELS_DIR, model_name), exist_ok=True)
+    shutil.copy(model_path, os.path.join(MODELS_DIR, model_name, "model.pth"))
+    shutil.copy(index_path, os.path.join(MODELS_DIR, model_name, "index.index"))
 
 
 def valid_model_name(name):

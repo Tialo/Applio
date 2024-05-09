@@ -16,15 +16,15 @@ def infer(user_id, model_name, infer_path, f0up):
         hop_length=128,
         f0method="rmvpe",
         input_path=os.path.join(input_dir, infer_path),
-        output_path=os.path.join(input_dir, infer_path.replace(".ogg", "out.ogg")),
-        pth_path=os.path.join(MODELS_DIR, f"{user_id}_{model_name}", "model.pth"),
-        index_path=os.path.join(MODELS_DIR, f"{user_id}_{model_name}", "index.index"),
+        output_path=os.path.join(input_dir, infer_path.replace(".ogg", "_out.ogg")),
+        pth_path=os.path.join(MODELS_DIR, model_name, "model.pth"),
+        index_path=os.path.join(MODELS_DIR, model_name, "index.index"),
         split_audio=False,
         f0autotune=False,
         clean_audio=False,
         clean_strength=0.5,
         export_format="OGG"
     )
-    asyncio.run(send_infer_file(user_id, os.path.join(input_dir, infer_path.replace(".ogg", "out.ogg"))))
+    asyncio.run(send_infer_file(user_id, os.path.join(input_dir, infer_path.replace(".ogg", "_out.ogg"))))
     os.remove(os.path.join(input_dir, infer_path))
-    os.remove(os.path.join(input_dir, infer_path.replace(".ogg", "out.ogg")))
+    os.remove(os.path.join(input_dir, infer_path.replace(".ogg", "_out.ogg")))

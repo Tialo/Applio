@@ -15,7 +15,7 @@ def main_loop():
                 continue
             curs.execute(
                 "select id, task_type, user_id, model_name, infer_path, f0up from queue "
-                "where status = 'queue' order by add_time asc limit 1"
+                "where status = 'В очереди' order by add_time asc limit 1"
             )
             [task_id, task_type, user_id, model_name, infer_path, f0up] = curs.fetchone()
             curs.execute("update queue set status = ? where id = ?", ("Задача выполняется", task_id))
@@ -58,7 +58,7 @@ def main_loop():
 
         with db.connect() as con:
             curs = con.cursor()
-            curs.execute("update queue set status = ? where id = ?", ("done", task_id))
+            curs.execute("delete from queue where id = ?", (task_id, ))
             con.commit()
 
 

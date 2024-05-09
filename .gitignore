@@ -25,3 +25,4 @@ img
 .DS_Store
 *.ipynb
 app/data.py
+app/test_bd.py
