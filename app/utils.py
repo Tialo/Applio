@@ -79,7 +79,7 @@ class DataBase:
                     status text not null,
                     add_time integer timestamp not null,
                     task_type text not null,
-                    infer_path text
+                    infer_path text,
                     f0up integer
                 )
             """)

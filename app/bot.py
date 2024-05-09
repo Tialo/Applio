@@ -5,7 +5,10 @@ import wave
 import shutil
 import logging
 import datetime
+from functools import wraps
 
+
+import matplotlib.pyplot as plt
 from telegram import ReplyKeyboardRemove, Update, ReplyKeyboardMarkup
 from telegram.ext import (
     Application,
@@ -30,6 +33,17 @@ TRAIN_PRETRAIN, TRAIN_EPOCHS, TRAIN_BATCH_SIZE, TRAIN_MODEL_NAME, TRAIN_DATASET 
 INFER_MODEL, INFER_PITCH = range(2)
 
 
+def cancel_handler(f):
+    @wraps(f)
+    async def inner(update: Update, context: ContextTypes.DEFAULT_TYPE):
+        if update.message.text == "/cancel":
+            await update.message.reply_text("Задача отменена", reply_markup=ReplyKeyboardRemove())
+            return ConversationHandler.END
+        return await f(update, context)
+    return inner
+
+
+@cancel_handler
 async def train_model(update: Update, context: ContextTypes.DEFAULT_TYPE) -> int:
     os.makedirs(os.path.join(DATA_DIR, str(update.message.from_user.id)), exist_ok=True)
     with db.connect() as con:
@@ -61,6 +75,7 @@ async def train_model(update: Update, context: ContextTypes.DEFAULT_TYPE) -> int
     return TRAIN_PRETRAIN
 
 
+@cancel_handler
 async def train_pretrain(update: Update, context: ContextTypes.DEFAULT_TYPE) -> int:
     pretrain = update.message.text
     if "; SR=" not in pretrain or not pretrain.endswith("HZ"):
@@ -87,6 +102,7 @@ async def train_pretrain(update: Update, context: ContextTypes.DEFAULT_TYPE) -> 
     return TRAIN_EPOCHS
 
 
+@cancel_handler
 async def train_epochs(update: Update, context: ContextTypes.DEFAULT_TYPE) -> int:
     epochs = update.message.text
     try:
@@ -117,6 +133,7 @@ async def train_epochs(update: Update, context: ContextTypes.DEFAULT_TYPE) -> in
     return TRAIN_BATCH_SIZE
 
 
+@cancel_handler
 async def train_batch_size(update: Update, context: ContextTypes.DEFAULT_TYPE) -> int:
     batch_size = update.message.text
     try:
@@ -147,6 +164,7 @@ async def train_batch_size(update: Update, context: ContextTypes.DEFAULT_TYPE) -
     return TRAIN_MODEL_NAME
 
 
+@cancel_handler
 async def train_model_name(update: Update, context: ContextTypes.DEFAULT_TYPE) -> int:
     model_name = update.message.text
     if not valid_model_name(model_name):
@@ -186,6 +204,7 @@ async def train_model_name(update: Update, context: ContextTypes.DEFAULT_TYPE) -
     return TRAIN_DATASET
 
 
+@cancel_handler
 async def train_dataset(update: Update, context: ContextTypes.DEFAULT_TYPE) -> int:
     attachment = update.message.effective_attachment
     reply_keyboard = [
@@ -312,6 +331,7 @@ async def dashboard(update: Update, context: ContextTypes.DEFAULT_TYPE) -> None:
     await update.message.reply_text(mes)
 
 
+@cancel_handler
 async def infer_start(update: Update, context: ContextTypes.DEFAULT_TYPE) -> int:
     with db.connect() as con:
         curs = con.cursor()
@@ -350,6 +370,7 @@ async def infer_start(update: Update, context: ContextTypes.DEFAULT_TYPE) -> int
     return INFER_MODEL
 
 
+@cancel_handler
 async def infer_model(update: Update, context: ContextTypes.DEFAULT_TYPE) -> int:
     model_name = update.message.text
     with db.connect() as con:
@@ -369,11 +390,12 @@ async def infer_model(update: Update, context: ContextTypes.DEFAULT_TYPE) -> int
         "то выбирайте отрицательное значение. Если хотите сделать наоборот, выбирайте положительное. "
         "Чем больше значение, тем сильнее изменение. Допустимые значения от -24 до 24. "
         "Если не хотите менять тон выберите 0",
-        reply_markup=ReplyKeyboardMarkup(["0"])
+        reply_markup=ReplyKeyboardMarkup([["0"]])
     )
     return INFER_PITCH
 
 
+@cancel_handler
 async def infer_pitch(update: Update, context: ContextTypes.DEFAULT_TYPE) -> int:
     pitch = update.message.text
     try:
@@ -393,7 +415,7 @@ async def infer_pitch(update: Update, context: ContextTypes.DEFAULT_TYPE) -> int
         now = int(time.time())
         curs.execute(
             "insert into queue (user_id, model_name, status, add_time, task_type, infer_path, f0up) values "
-            "(?, ?, ?, ?, ?, ?)", (update.message.from_user.id, model_name, "queue", now, "infer", infer_path, pitch)
+            "(?, ?, ?, ?, ?, ?, ?)", (update.message.from_user.id, model_name, "queue", now, "infer", infer_path, pitch)
         )
         con.commit()
 
