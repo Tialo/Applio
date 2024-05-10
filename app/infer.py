@@ -6,7 +6,7 @@ from utils import DATA_DIR, MODELS_DIR, send_infer_file
 
 
 def infer(user_id, model_name, infer_path, f0up):
-    input_dir = os.path.join(DATA_DIR, "infer", str(user_id))
+    input_dir = os.path.join(DATA_DIR, "infer")
     run_infer_script(
         f0up_key=f0up,
         filter_radius=3,

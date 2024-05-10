@@ -6,7 +6,6 @@ import json
 import shutil
 import logging
 import datetime
-from functools import wraps
 
 
 from telegram import ReplyKeyboardRemove, Update, ReplyKeyboardMarkup, InlineKeyboardButton, InlineKeyboardMarkup
@@ -20,7 +19,7 @@ from telegram.ext import (
     CallbackQueryHandler,
 )
 
-from utils import db, DATA_DIR, valid_model_name, token, MODELS_DIR
+from utils import db, DATA_DIR, valid_model_name, token, MODELS_DIR, cancel_handler
 
 
 logging.basicConfig(
@@ -34,14 +33,18 @@ TRAIN_PRETRAIN, TRAIN_EPOCHS, TRAIN_BATCH_SIZE, TRAIN_MODEL_NAME, TRAIN_DATASET 
 INFER_MODEL, INFER_PITCH = range(2)
 
 
-def cancel_handler(f):
-    @wraps(f)
-    async def inner(update: Update, context: ContextTypes.DEFAULT_TYPE):
-        if update.message.text == "/cancel":
-            await update.message.reply_text("Задача отменена", reply_markup=ReplyKeyboardRemove())
-            return ConversationHandler.END
-        return await f(update, context)
-    return inner
+async def start(update: Update, context: ContextTypes.DEFAULT_TYPE) -> None:
+    msg = (
+        "Бот @easyvcbot создан для создания и использования моделей Voice Conversion.\n\n"
+        "Для его использования отправьте голосовое сообщение в чат и выберите модель, "
+        "с помощью которой хотите изменить свой голос.\n\n"
+        "Для обучения новой модели используйте команду /train_model\n\n"
+        "Для получения списка своих моделей используйте команду /models\n"
+        "Для получения списка своих активных задач используйте команду /dashboard\n"
+        "Для отмены добавления задачи используйте команду /cancel в любой момент добавления\n\n"
+        "Для повторного вызова этой информации используйте команду /start"
+    )
+    await update.message.reply_text(msg)
 
 
 @cancel_handler
@@ -143,11 +146,8 @@ async def train_batch_size(update: Update, context: ContextTypes.DEFAULT_TYPE) -
         await update.message.reply_text("Размер батча - целое число. Повторите попытку.")
         return TRAIN_BATCH_SIZE
 
-    if batch_size < 1:
-        await update.message.reply_text("Минимальный размер батча - 1. Повторите попытку")
-        return TRAIN_BATCH_SIZE
-    elif batch_size > 12:
-        await update.message.reply_text("Максимальный размер батча - 12. Повторите попытку")
+    if not 1 <= batch_size <= 15:
+        await update.message.reply_text("Допустимы размер батча от 1 до 15. Повторите попытку")
         return TRAIN_BATCH_SIZE
 
     with db.connect() as con:
@@ -169,7 +169,9 @@ async def train_batch_size(update: Update, context: ContextTypes.DEFAULT_TYPE) -
 async def train_model_name(update: Update, context: ContextTypes.DEFAULT_TYPE) -> int:
     model_name = update.message.text
     if not valid_model_name(model_name):
-        await update.message.reply_text("Название модели может содержать только цифры и латинские буквы. Повторите попытку")
+        await update.message.reply_text(
+            "Название модели может содержать только цифры и латинские буквы. Повторите попытку"
+        )
         return TRAIN_MODEL_NAME
 
     if len(model_name) > 32:
@@ -179,11 +181,11 @@ async def train_model_name(update: Update, context: ContextTypes.DEFAULT_TYPE) -
     with db.connect() as con:
         curs = con.cursor()
         curs.execute(
-            "select count(*) from models where user_id = ? and model_name = ?",
-            (model_name, update.message.from_user.id)
+            "select count(*) from models where model_name = ?",
+            (model_name, )
         )
         if curs.fetchone()[0]:
-            await update.message.reply_text("У вас уже есть модель с таким названием. Повторите попытку")
+            await update.message.reply_text("Модель с таким названием уже есть. Повторите попытку")
             return TRAIN_MODEL_NAME
 
         curs.execute(
@@ -253,7 +255,7 @@ async def train_dataset(update: Update, context: ContextTypes.DEFAULT_TYPE) -> i
         await update.message.reply_text("Название файла должно оканчиваться на .wav", reply_markup=markup)
         return TRAIN_DATASET
 
-    os.makedirs(os.path.join(DATA_DIR, str(update.message.from_user.id), model_name), exist_ok=True)
+    os.makedirs(os.path.join(DATA_DIR, model_name), exist_ok=True)
     try:
         file = await attachment.get_file()
     except:
@@ -277,7 +279,7 @@ async def train_dataset(update: Update, context: ContextTypes.DEFAULT_TYPE) -> i
         )
         return TRAIN_DATASET
 
-    file_path = os.path.join(DATA_DIR, str(update.message.from_user.id), model_name, str(file_index)) + ".wav"
+    file_path = os.path.join(DATA_DIR, model_name, str(file_index)) + ".wav"
     await file.download_to_drive(file_path)
 
     try:
@@ -429,8 +431,8 @@ async def infer_start(update: Update, context: ContextTypes.DEFAULT_TYPE) -> int
     attachment = update.message.effective_attachment
     file = await attachment.get_file()
     filename = uuid.uuid4().hex + ".ogg"
-    os.makedirs(os.path.join(DATA_DIR, "infer", str(update.message.from_user.id)), exist_ok=True)
-    await file.download_to_drive(os.path.join(DATA_DIR, "infer", str(update.message.from_user.id), filename))
+    os.makedirs(os.path.join(DATA_DIR, "infer"), exist_ok=True)
+    await file.download_to_drive(os.path.join(DATA_DIR, "infer", filename))
     with db.connect() as con:
         curs = con.cursor()
         curs.execute("delete from infers where user_id = ?", (update.message.from_user.id,))
@@ -524,6 +526,7 @@ def main() -> None:
 
     application.add_handler(train_handler)
     application.add_handler(infer_handler)
+    application.add_handler(CommandHandler("start", start))
     application.add_handler(CommandHandler("models", models))
     application.add_handler(CommandHandler("dashboard", dashboard))
     application.add_handler(CallbackQueryHandler(my_model, "^my_model.*"))

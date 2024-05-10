@@ -4,8 +4,10 @@ import shutil
 from string import ascii_letters
 import sqlite3
 from pathlib import Path
+from functools import wraps
 
-from telegram import Bot
+from telegram import Bot, Update, ReplyKeyboardRemove
+from telegram.ext import ContextTypes, ConversationHandler
 from pydub import AudioSegment
 
 token = os.environ["TOKEN"]
@@ -14,6 +16,16 @@ ROOT_DIR = Path(__file__).parent.parent
 DATA_DIR = ROOT_DIR / "data"
 MODELS_DIR = ROOT_DIR / "models"
 os.makedirs(DATA_DIR, exist_ok=True)
+
+
+def cancel_handler(f):
+    @wraps(f)
+    async def inner(update: Update, context: ContextTypes.DEFAULT_TYPE):
+        if update.message.text == "/cancel":
+            await update.message.reply_text("Задача отменена", reply_markup=ReplyKeyboardRemove())
+            return ConversationHandler.END
+        return await f(update, context)
+    return inner
 
 
 class DataBase:
@@ -66,7 +78,7 @@ class DataBase:
                 create table if not exists train_data (
                     id integer primary key,
                     user_id integer not null,
-                    model_name integer not null,
+                    model_name text not null,
                     filename text not null
                 )
             """)
@@ -75,7 +87,7 @@ class DataBase:
                 create table if not exists queue (
                     id integer primary key,
                     user_id integer not null,
-                    model_name integer not null,
+                    model_name text not null,
                     status text not null,
                     add_time integer timestamp not null,
                     task_type text not null,

@@ -23,14 +23,14 @@ def main_loop():
         if task_type == "train":
             print(f"train {user_id=} {model_name=}")
             try:
-                train.train(task_id, user_id, model_name)
+                train.train(task_id, model_name)
             except Exception as e:
                 print(e)
                 print(str(e))
                 with db.connect() as con:
                     curs = con.cursor()
-                    # curs.execute("delete from models where user_id = ? and model_name = ?", (user_id, model_name))
-                    # con.commit()
+                    curs.execute("delete from models where user_id = ? and model_name = ?", (user_id, model_name))
+                    con.commit()
                     curs.execute("update queue set status = ? where id = ?", ("error", task_id))
                     con.commit()
                 raise e  # TODO: Заменить на логи
@@ -44,11 +44,11 @@ def main_loop():
                 print(str(e))
                 with db.connect() as con:
                     curs = con.cursor()
-                    # curs.execute(
-                    #     "delete from infers where user_id = ? and model_name = ? and infer_path = ?",
-                    #     (user_id, model_name, infer_path)
-                    # )
-                    # con.commit()
+                    curs.execute(
+                        "delete from infers where user_id = ? and model_name = ? and infer_path = ?",
+                        (user_id, model_name, infer_path)
+                    )
+                    con.commit()
                     curs.execute("update queue set status = ? where id = ?", ("error", task_id))
                     con.commit()
                 raise e  # TODO: Заменить на логи
