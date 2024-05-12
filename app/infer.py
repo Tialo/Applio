@@ -6,6 +6,7 @@ from utils import DATA_DIR, MODELS_DIR, send_infer_file
 
 
 def infer(user_id, model_name, infer_path, f0up):
+    """Запускает задачу применения модели"""
     input_dir = os.path.join(DATA_DIR, "infer")
     run_infer_script(
         f0up_key=f0up,

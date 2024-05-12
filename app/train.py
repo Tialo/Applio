@@ -12,6 +12,7 @@ from utils import db, DATA_DIR, MODELS_DIR, ROOT_DIR, update_status
 
 
 def merge_wav(model_name):
+    """Соединяет wav файлы, отправленные пользователем, в один файл"""
     merged = AudioSegment.empty()
     wav_folder = os.path.join(DATA_DIR, model_name)
     for file in os.listdir(os.path.join(DATA_DIR, model_name)):
@@ -25,19 +26,23 @@ def merge_wav(model_name):
 
 
 def create_dataset(model_name):
+    """Создает датасет"""
     filename = merge_wav(model_name)
     save_drop_dataset_audio(filename, model_name)
 
 
 def preprocess_dataset(model_name, sr):
+    """Предобрабатывает датасет"""
     run_preprocess_script(model_name, f"assets/datasets/{model_name}", str(sr))
 
 
-def extract_features( model_name, sr):
+def extract_features(model_name, sr):
+    """Выдяет признаки, нужные для обучения модели"""
     run_extract_script(model_name, "v2", "rmvpe", 128, str(sr))
 
 
 def train_model(model_name, epochs, batch_size, sr, g_path, d_path):
+    """Запускает скрипт обучения"""
     run_train_script(
         model_name=model_name,
         rvc_version="v2",
@@ -59,6 +64,7 @@ def train_model(model_name, epochs, batch_size, sr, g_path, d_path):
 
 
 def save_model(model_name):
+    """Сохраняет модель"""
     index_dir = os.path.join(ROOT_DIR, "logs", str(model_name))
     index_file = [
         file for file in
@@ -80,6 +86,7 @@ def save_model(model_name):
 
 
 def train(task_id, model_name):
+    """Запускает задачу обучения модели"""
     with db.connect() as con:
         curs = con.cursor()
         curs.execute(
